@@ -1,0 +1,19 @@
+name: CI Rerun
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+jobs:
+  rerun-ci-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: |
+          if [[ ${{ github.event.workflow_run.conclusion }} == 'failure' ]]; then
+            exit 1
+          else
+            exit 0
+          fi
