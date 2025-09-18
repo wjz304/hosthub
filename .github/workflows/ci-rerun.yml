@@ -1,0 +1,33 @@
+name: CI Rerun
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+jobs:
+  rerun-ci-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Init Env
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          sudo timedatectl set-timezone "Asia/Shanghai"
+
+      - name: CI status
+        run: |
+          echo '${{ toJSON(github.event.workflow_run) }}'
+
+      - name: Rerun CI
+        run: |
+          git pull
+          date +%s > timestamp
+          git add timestamp
+          git commit -m "update timestamp"
+          git push

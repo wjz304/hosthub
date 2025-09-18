@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'timestamp'
+
+jobs:
+  sshx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Init Env
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          sudo timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Rerun CI status
+        run: |
+          echo "workflow run status: ${{ github.event.workflow_run.status }}"
+          exit 0
+
+      - name: run sshx
+        run: |
+          docker run -d -it --rm --name sshx -u root --privileged --network host -v /mnt:/mnt -v /tmp:/tmp -w /root ubuntu:latest bash -c "
+            apt-get update && apt-get install -y curl
+            echo -e '#!/bin/bash\ntouch /tmp/poweroff' > /usr/sbin/poweroff
+            chmod +x /usr/sbin/poweroff
+            echo -e '#!/bin/bash\ntouch /tmp/shutdown' > /usr/sbin/shutdown
+            chmod +x /usr/sbin/shutdown
+            curl -sSf https://sshx.io/get | sh
+            /usr/local/bin/sshx -q > /tmp/sshx.link 2>&1 &
+            while [ ! -f /tmp/poweroff ] && [ ! -f /tmp/shutdown ]; do sleep 1; done
+            kill $(pgrep -f /usr/local/bin/sshx)
+          "
+
+          while [ -z "$(cat /tmp/sshx.link 2>/dev/null)" ]; do sleep 0.1; done
+          link=$(cat /tmp/sshx.link 2>/dev/null)
+          git pull
+          sed -i "s|src=\".*\"|src=\"${link}\"|" docs/index.html
+          git add docs/index.html
+          git commit -m "update sshx link"
+          git push
+
+          while [ -n "$(docker ps -q -f name=sshx)" ]; do sleep 1; done
+
+          exit 0
